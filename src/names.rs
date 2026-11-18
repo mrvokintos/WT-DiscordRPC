@@ -20,22 +20,17 @@ pub fn parse(text: &str) -> Result<Names, String> {
 }
 
 pub fn load() -> Names {
-    let embedded = parse(EMBEDDED).expect("embedded names.json");
     match std::fs::read_to_string(paths::file(paths::NAMES_FILE)).map_err(|e| e.to_string()).and_then(|t| parse(&t)) {
-        // a file from an older parser has no nation/class: the built-in copy is better then
-        Ok(n) if n.len() >= MIN_ENTRIES && (has_info(&n) || !has_info(&embedded)) => {
+        Ok(n) if n.len() >= MIN_ENTRIES => {
             log::info!("vehicle names: {} (downloaded)", n.len());
             n
         }
         _ => {
+            let embedded = parse(EMBEDDED).expect("embedded names.json");
             log::info!("vehicle names: {} (built in)", embedded.len());
             embedded
         }
     }
-}
-
-fn has_info(n: &Names) -> bool {
-    n.values().any(|v| v.contains_key("nation"))
 }
 
 /// Name in the column (`English`, `Russian`), falling back to English, then a prettified id.
@@ -54,7 +49,7 @@ pub fn lookup(names: &Names, id: &str, column: &str) -> String {
     }
 }
 
-/// Extra data from names.json (`nation`, `class`); absent in files from older parsers.
+/// Extra data from names.json: `nation`, `class`.
 pub fn info<'a>(names: &'a Names, id: &str, key: &str) -> Option<&'a str> {
     names.get(id)?.get(key).map(String::as_str)
 }

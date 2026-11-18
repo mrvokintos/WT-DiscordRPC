@@ -79,9 +79,6 @@ pub struct Config {
     pub wiki_button: bool,
     /// "WT Discord RPC" button linking to the project
     pub repo_button: bool,
-    /// one switch for both buttons in 0.1.0; read once and split
-    #[serde(skip_serializing)]
-    pub buttons: Option<bool>,
     /// game API (the WT_API_URL environment variable overrides it)
     pub api_url: String,
     /// where names.json and manifest.json are downloaded from; empty disables updates
@@ -106,7 +103,6 @@ impl Default for Config {
             battle_timer: false,
             wiki_button: false,
             repo_button: false,
-            buttons: None,
             api_url: DEFAULT_API_URL.into(),
             names_url: DEFAULT_NAMES_URL.into(),
             check_updates: true,
@@ -118,15 +114,8 @@ impl Config {
     pub fn load() -> Self {
         let path = paths::file(paths::CONFIG_FILE);
         let cfg = match std::fs::read_to_string(&path) {
-            Ok(text) => match toml::from_str::<Config>(&text) {
-                Ok(mut c) => {
-                    if let Some(b) = c.buttons.take() {
-                        c.wiki_button |= b;
-                        c.repo_button |= b;
-                        c.save();
-                    }
-                    c
-                }
+            Ok(text) => match toml::from_str(&text) {
+                Ok(c) => c,
                 Err(e) => {
                     log::error!("{}: {e}; using defaults", path.display());
                     return Self::default();
@@ -187,12 +176,7 @@ mod tests {
         assert_eq!(p.logo, Logo::Red);
         let d: Config = toml::from_str("logo = \"main_diamond\"").unwrap();
         assert_eq!(d.logo.asset(), "main_diamond");
-        let old: Config = toml::from_str("buttons = true").unwrap();
-        assert_eq!(old.buttons, Some(true));
-        assert!(!toml::to_string(&old).unwrap().contains("buttons ="), "the old key is not written back");
         assert_eq!(p.air_speed, AirSpeed::Tas);
         assert!(p.show_indicators);
-        // keys of older versions are ignored
-        assert!(toml::from_str::<Config>("interval_secs = 5").is_ok());
     }
 }

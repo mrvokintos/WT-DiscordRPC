@@ -36,7 +36,8 @@ pub fn build(snap: &Snapshot, ctx: &Ctx) -> (String, Option<Value>) {
         Snapshot::NotRunning => (tr(l, "game_not_running").into(), None),
         Snapshot::Hangar => (tr(l, "hangar").into(), Some(simple(tr(l, "hangar")))),
         Snapshot::Loading => (tr(l, "loading").into(), Some(simple(tr(l, "loading")))),
-        Snapshot::Ground(ind) | Snapshot::Air(ind, _) => {
+        Snapshot::InBattle => (tr(l, "in_battle").into(), Some(simple(tr(l, "in_battle")))),
+        Snapshot::Ground(ind) | Snapshot::Air(ind, _) | Snapshot::Other(ind) => {
             let id = api::vehicle_id(&ind.vehicle);
             let name = names::lookup(ctx.names, &id, names_column(l));
             let details = format!("{}: {name}", tr(l, "plays_on"));
@@ -44,8 +45,10 @@ pub fn build(snap: &Snapshot, ctx: &Ctx) -> (String, Option<Value>) {
                 None
             } else if let Snapshot::Air(ind, st) = snap {
                 air_state(ctx.cfg, l, ind, st.as_ref())
-            } else {
+            } else if let Snapshot::Ground(ind) = snap {
                 ground_state(l, ind)
+            } else {
+                None
             };
             let image = if ctx.cfg.custom_images && ctx.assets.contains(&id) { id.clone() } else { format!("{IMAGE_URL}/{id}.png") };
             let mut a = json!({

@@ -111,6 +111,8 @@ fn now() -> u64 {
 
 /// Discord allows about 5 activity updates per 20 s; stay well below.
 const MIN_SEND_INTERVAL: Duration = Duration::from_secs(4);
+/// how long the API may stay silent before the game counts as closed
+const GAME_GONE_AFTER: Duration = Duration::from_secs(45);
 
 pub fn run_poller(app: App) {
     let mut client: Option<ipc::Client> = None;
@@ -119,6 +121,7 @@ pub fn run_poller(app: App) {
     let mut sent: Option<Option<Value>> = None;
     let mut last_send = Instant::now() - MIN_SEND_INTERVAL;
     let mut start: Option<u64> = None;
+    let mut last_seen: Option<Instant> = None;
 
     loop {
         let (cfg, names, assets, quit) = app.with(|s| {
@@ -139,10 +142,17 @@ pub fn run_poller(app: App) {
         }
 
         let snap = Api::new(cfg.api_url()).snapshot(cfg.show_indicators);
-        match (&snap, start) {
-            (Snapshot::NotRunning, _) => start = None,
-            (_, None) => start = Some(now()),
-            _ => {}
+        if matches!(snap, Snapshot::NotRunning) {
+            // the API stops answering for a while when a battle loads: keep the presence and timer
+            if last_seen.is_some_and(|t| t.elapsed() < GAME_GONE_AFTER) {
+                app.wait(Duration::from_secs(cfg.interval_secs));
+                continue;
+            }
+            last_seen = None;
+            start = None;
+        } else {
+            last_seen = Some(Instant::now());
+            start.get_or_insert_with(now);
         }
         let ctx = Ctx { cfg: &cfg, lang: cfg.lang(), names: &names, assets: &assets, start: start.unwrap_or_else(now) };
         let (status, activity) = presence::build(&snap, &ctx);

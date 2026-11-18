@@ -38,8 +38,12 @@ pub enum Snapshot {
     NotRunning,
     Hangar,
     Loading,
+    /// battle map is up but there is no vehicle: respawn screen, spectating, after death
+    InBattle,
     Ground(Indicators),
     Air(Indicators, Option<State>),
+    /// ships and anything else: name and picture only
+    Other(Indicators),
 }
 
 pub struct Api {
@@ -72,7 +76,7 @@ impl Api {
             Ok(Ok(i)) => i,
             other => {
                 log::debug!("indicators: {other:?}");
-                return Snapshot::Loading;
+                return Snapshot::InBattle;
             }
         };
         let air = ind.army == "air";
@@ -82,13 +86,16 @@ impl Api {
 }
 
 pub fn classify(ind: Indicators, state: Option<State>) -> Snapshot {
-    if !ind.valid || ind.army == "dummy_plane" || ind.vehicle == "dummy_plane" || ind.vehicle.is_empty() {
+    if ind.army == "dummy_plane" || ind.vehicle == "dummy_plane" {
         return Snapshot::Loading;
+    }
+    if !ind.valid || ind.vehicle.is_empty() {
+        return Snapshot::InBattle;
     }
     match ind.army.as_str() {
         "tank" => Snapshot::Ground(ind),
         "air" => Snapshot::Air(ind, state.filter(|s| s.valid)),
-        _ => Snapshot::Loading,
+        _ => Snapshot::Other(ind),
     }
 }
 
@@ -126,6 +133,8 @@ mod tests {
         let ind: Indicators = serde_json::from_value(fixture("indicators_dummy")).unwrap();
         assert!(matches!(classify(ind, None), Snapshot::Loading));
         let invalid: Indicators = serde_json::from_value(serde_json::json!({ "valid": false })).unwrap();
-        assert!(matches!(classify(invalid, None), Snapshot::Loading));
+        assert!(matches!(classify(invalid, None), Snapshot::InBattle));
+        let ship: Indicators = serde_json::from_value(serde_json::json!({ "valid": true, "army": "ship", "type": "us_destroyer_fletcher" })).unwrap();
+        assert!(matches!(classify(ship, None), Snapshot::Other(_)));
     }
 }

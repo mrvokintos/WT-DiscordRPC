@@ -5,6 +5,7 @@ pub fn tr(lang: Lang, key: &str) -> &'static str {
     let (en, ru) = match key {
         "hangar" => ("In hangar", "В ангаре"),
         "loading" => ("Loading...", "Загружается..."),
+        "in_battle" => ("In battle", "В бою"),
         "plays_on" => ("Plays on", "Играет на"),
         "tas" => ("TAS", "Скорость TAS"),
         "ias" => ("IAS", "Скорость IAS"),

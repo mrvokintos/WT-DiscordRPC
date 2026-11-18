@@ -12,8 +12,11 @@ const MIN_ENTRIES: usize = 1500;
 
 pub type Names = HashMap<String, HashMap<String, String>>;
 
+/// Keys are lowercased: the game reports some ids in a different case than the
+/// datamine (`us_m47_patton_ii` vs `us_m47_patton_II`).
 pub fn parse(text: &str) -> Result<Names, String> {
-    serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| e.to_string())
+    let raw: Names = serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| e.to_string())?;
+    Ok(raw.into_iter().map(|(k, v)| (k.to_lowercase(), v)).collect())
 }
 
 pub fn load() -> Names {
@@ -32,11 +35,28 @@ pub fn load() -> Names {
 
 /// Name in the column (`English`, `Russian`), falling back to English, then a prettified id.
 pub fn lookup(names: &Names, id: &str, column: &str) -> String {
-    names
-        .get(id)
-        .and_then(|n| n.get(column).or_else(|| n.get("English")))
-        .cloned()
-        .unwrap_or_else(|| id.replace('_', " "))
+    match names.get(id).and_then(|n| n.get(column).or_else(|| n.get("English"))) {
+        Some(n) => n.clone(),
+        None => {
+            static WARNED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+            let mut w = WARNED.lock().unwrap_or_else(|e| e.into_inner());
+            if !w.iter().any(|x| x == id) {
+                log::warn!("no name for vehicle id {id}");
+                w.push(id.to_string());
+            }
+            prettify(id)
+        }
+    }
+}
+
+/// `us_m47_patton_ii` → `M47 PATTON II`: without the nation prefix, upper case.
+fn prettify(id: &str) -> String {
+    const PREFIXES: &[&str] = &["us", "germ", "ussr", "uk", "jp", "cn", "it", "fr", "sw", "il"];
+    let mut parts: Vec<&str> = id.split('_').filter(|p| !p.is_empty()).collect();
+    if parts.len() > 1 && PREFIXES.contains(&parts[0]) {
+        parts.remove(0);
+    }
+    parts.join(" ").to_uppercase()
 }
 
 fn installed_version() -> Option<String> {
@@ -107,6 +127,7 @@ mod tests {
         assert_eq!(lookup(&n, "ussr_t_80ue1", "English"), "T-80U-E1");
         // no Russian column when it equals English
         assert_eq!(lookup(&n, "germ_leopard_2a7v", "Russian"), "Leopard 2A7V");
-        assert_eq!(lookup(&n, "no_such_vehicle", "English"), "no such vehicle");
+        assert_eq!(lookup(&n, "us_no_such_tank", "English"), "NO SUCH TANK");
+        assert_eq!(lookup(&n, &crate::api::vehicle_id("tankModels/us_m47_patton_II"), "English"), "M47");
     }
 }

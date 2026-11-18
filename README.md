@@ -33,7 +33,8 @@ Most settings are in the tray menu. All of them are also stored in `config.toml`
 | `nickname` | empty | your in-game nickname without the squadron tag, case-sensitive |
 | `show_nation` | `false` | nation and vehicle class under the small image; with its flag (the application's `flag_<nation>` image if uploaded, otherwise the one from `assets/flags`) |
 | `battle_timer` | `false` | in a battle the timer counts from the battle's start, in the hangar from the game's start |
-| `buttons` | `false` | "Vehicle on wiki" and "WT Discord RPC" buttons; Discord shows them to others, not to you |
+| `wiki_button` | `false` | "Vehicle on wiki" button while on a vehicle; Discord shows buttons to others, not to you |
+| `repo_button` | `false` | "WT Discord RPC" button linking to this project |
 | `api_url` | `http://localhost:8111` | game API address (the `WT_API_URL` environment variable overrides it) |
 | `names_url` | WT-Vehicles-Parser `db-latest` | where vehicle names are updated from; empty disables updates |
 | `check_updates` | `true` | check for a new version on start |

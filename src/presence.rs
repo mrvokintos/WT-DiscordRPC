@@ -58,12 +58,14 @@ pub fn build(snap: &Snapshot, ctx: &Ctx) -> (String, Option<Value>) {
         if let Some(s) = state.filter(|s| !s.is_empty()) {
             a["state"] = json!(clamp(&s));
         }
-        if ctx.cfg.buttons {
-            let mut b = vec![];
-            if let Some(id) = id {
-                b.push(json!({ "label": tr(l, "wiki_button"), "url": format!("{WIKI_URL}/{id}") }));
-            }
+        let mut b = vec![];
+        if let Some(id) = id.filter(|_| ctx.cfg.wiki_button) {
+            b.push(json!({ "label": tr(l, "wiki_button"), "url": format!("{WIKI_URL}/{id}") }));
+        }
+        if ctx.cfg.repo_button {
             b.push(json!({ "label": "WT Discord RPC", "url": format!("https://github.com/{}", crate::update::REPO) }));
+        }
+        if !b.is_empty() {
             a["buttons"] = json!(b);
         }
         a
@@ -247,7 +249,8 @@ mod tests {
             nickname: "me".into(),
             show_nation: true,
             battle_timer: true,
-            buttons: true,
+            wiki_button: true,
+            repo_button: true,
             ..Default::default()
         };
         let mut battle = Battle::default();
@@ -276,6 +279,13 @@ mod tests {
         assert_eq!(act["timestamps"]["start"], 100);
         assert!(act.get("state").is_none());
         assert_eq!(act["buttons"].as_array().unwrap().len(), 1);
+        // only the wiki button: none in the hangar
+        let cfg = Config { wiki_button: true, ..Default::default() };
+        let ctx = Ctx { cfg: &cfg, lang: Lang::En, names: &n, assets: &none, start: 100, battle: &battle };
+        assert!(build(&Snapshot::Hangar, &ctx).1.unwrap().get("buttons").is_none());
+        let act = build(&tank(), &ctx).1.unwrap();
+        assert_eq!(act["buttons"].as_array().unwrap().len(), 1);
+        assert_eq!(act["buttons"][0]["label"], "Vehicle on wiki");
     }
 
     #[test]

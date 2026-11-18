@@ -111,6 +111,8 @@ fn now() -> u64 {
 
 /// Discord allows about 5 activity updates per 20 s; stay well below.
 const MIN_SEND_INTERVAL: Duration = Duration::from_secs(4);
+/// the game is polled often so that every send carries fresh values
+const POLL_INTERVAL: Duration = Duration::from_secs(1);
 /// how long the API may stay silent before the game counts as closed
 const GAME_GONE_AFTER: Duration = Duration::from_secs(45);
 
@@ -122,6 +124,7 @@ pub fn run_poller(app: App) {
     let mut last_send = Instant::now() - MIN_SEND_INTERVAL;
     let mut start: Option<u64> = None;
     let mut last_seen: Option<Instant> = None;
+    let mut api: Option<(String, Api)> = None;
 
     loop {
         let (cfg, names, assets, quit) = app.with(|s| {
@@ -141,11 +144,14 @@ pub fn run_poller(app: App) {
             client_id = cfg.client_id.clone();
         }
 
-        let snap = Api::new(cfg.api_url()).snapshot(cfg.show_indicators);
+        if api.as_ref().is_none_or(|(url, _)| *url != cfg.api_url()) {
+            api = Some((cfg.api_url(), Api::new(cfg.api_url())));
+        }
+        let snap = api.as_ref().map(|(_, a)| a.snapshot(cfg.show_indicators)).unwrap_or(Snapshot::NotRunning);
         if matches!(snap, Snapshot::NotRunning) {
             // the API stops answering for a while when a battle loads: keep the presence and timer
             if last_seen.is_some_and(|t| t.elapsed() < GAME_GONE_AFTER) {
-                app.wait(Duration::from_secs(cfg.interval_secs));
+                app.wait(POLL_INTERVAL);
                 continue;
             }
             last_seen = None;
@@ -177,7 +183,7 @@ pub fn run_poller(app: App) {
                 last_send = Instant::now();
                 match c.set_activity(activity.as_ref()) {
                     Ok(()) => {
-                        log::info!("presence: {status}");
+                        log::info!("presence: {status} {}", activity.as_ref().and_then(|a| a.get("state")).and_then(|s| s.as_str()).unwrap_or(""));
                         sent = Some(activity.clone());
                     }
                     Err(e) => {
@@ -202,6 +208,6 @@ pub fn run_poller(app: App) {
             s.status = status;
             s.discord_ok = discord_ok;
         });
-        app.wait(Duration::from_secs(cfg.interval_secs));
+        app.wait(POLL_INTERVAL);
     }
 }

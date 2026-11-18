@@ -29,7 +29,6 @@ Most settings are in the tray menu. All of them are also stored in `config.toml`
 | `air_speed` | `IAS` | `IAS` or `TAS` |
 | `altitude` | `RADIO` | `RADIO` (falls back to absolute when unavailable) or `ABSOLUTE` |
 | `custom_images` | `true` | use the application's own image for a vehicle when one exists |
-| `interval_secs` | `5` | game API poll interval |
 | `api_url` | `http://localhost:8111` | game API address (the `WT_API_URL` environment variable overrides it) |
 | `names_url` | WT-Vehicles-Parser `db-latest` | where vehicle names are updated from; empty disables updates |
 | `check_updates` | `true` | check for a new version on start |

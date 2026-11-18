@@ -63,8 +63,6 @@ pub struct Config {
     pub altitude: Altitude,
     /// use the application's own images for vehicles that have one
     pub custom_images: bool,
-    /// game API poll interval, seconds
-    pub interval_secs: u64,
     /// game API (the WT_API_URL environment variable overrides it)
     pub api_url: String,
     /// where names.json and manifest.json are downloaded from; empty disables updates
@@ -83,7 +81,6 @@ impl Default for Config {
             air_speed: AirSpeed::Ias,
             altitude: Altitude::Radio,
             custom_images: true,
-            interval_secs: 5,
             api_url: DEFAULT_API_URL.into(),
             names_url: DEFAULT_NAMES_URL.into(),
             check_updates: true,
@@ -108,12 +105,7 @@ impl Config {
                 c
             }
         };
-        cfg.sanitized()
-    }
-
-    fn sanitized(mut self) -> Self {
-        self.interval_secs = self.interval_secs.clamp(1, 60);
-        self
+        cfg
     }
 
     pub fn save(&self) {
@@ -161,6 +153,8 @@ mod tests {
         assert_eq!(p.lang, Lang::Ru);
         assert_eq!(p.logo, Logo::Red);
         assert_eq!(p.air_speed, AirSpeed::Tas);
-        assert_eq!(p.interval_secs, 5);
+        assert!(p.show_indicators);
+        // keys of older versions are ignored
+        assert!(toml::from_str::<Config>("interval_secs = 5").is_ok());
     }
 }

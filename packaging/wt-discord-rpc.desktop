@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=WT Discord RPC
+Comment=Discord Rich Presence for War Thunder
+Exec=wt-discord-rpc
+Icon=applications-games
+Terminal=false
+Categories=Game;

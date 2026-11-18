@@ -23,34 +23,44 @@ fn icon() -> Icon {
     Icon::from_rgba(rgba, n as u32, n as u32).expect("icon")
 }
 
+fn make(it: Item, ids: &mut HashMap<MenuId, Action>) -> Box<dyn IsMenuItem> {
+    match it {
+        Item::Label(l) => Box::new(MenuItem::new(l, false, None)),
+        Item::Action(l, a) => {
+            let m = MenuItem::new(l, true, None);
+            ids.insert(m.id().clone(), a);
+            Box::new(m)
+        }
+        Item::Check(l, checked, a) => {
+            let m = CheckMenuItem::new(l, true, checked, None);
+            ids.insert(m.id().clone(), a);
+            Box::new(m)
+        }
+        Item::Radio(l, selected, options) => {
+            let sub = Submenu::new(l, true);
+            for (i, (label, a)) in options.into_iter().enumerate() {
+                let m = CheckMenuItem::new(label, true, i == selected, None);
+                ids.insert(m.id().clone(), a);
+                let _ = sub.append(&m);
+            }
+            Box::new(sub)
+        }
+        Item::Sub(l, items) => {
+            let sub = Submenu::new(l, true);
+            for it in items {
+                let _ = sub.append(make(it, ids).as_ref());
+            }
+            Box::new(sub)
+        }
+        Item::Separator => Box::new(PredefinedMenuItem::separator()),
+    }
+}
+
 fn build(app: &App) -> (TMenu, HashMap<MenuId, Action>) {
     let menu = TMenu::new();
     let mut ids = HashMap::new();
     for it in Menu::build(app) {
-        let entry: Box<dyn IsMenuItem> = match it {
-            Item::Label(l) => Box::new(MenuItem::new(l, false, None)),
-            Item::Action(l, a) => {
-                let m = MenuItem::new(l, true, None);
-                ids.insert(m.id().clone(), a);
-                Box::new(m)
-            }
-            Item::Check(l, checked, a) => {
-                let m = CheckMenuItem::new(l, true, checked, None);
-                ids.insert(m.id().clone(), a);
-                Box::new(m)
-            }
-            Item::Radio(l, selected, options) => {
-                let sub = Submenu::new(l, true);
-                for (i, (label, a)) in options.into_iter().enumerate() {
-                    let m = CheckMenuItem::new(label, true, i == selected, None);
-                    ids.insert(m.id().clone(), a);
-                    let _ = sub.append(&m);
-                }
-                Box::new(sub)
-            }
-            Item::Separator => Box::new(PredefinedMenuItem::separator()),
-        };
-        let _ = menu.append(entry.as_ref());
+        let _ = menu.append(make(it, &mut ids).as_ref());
     }
     (menu, ids)
 }

@@ -24,11 +24,16 @@ Discord находится автоматически, как бы он ни б�
 |---|---|---|
 | `client_id` | приложение проекта | id приложения Discord (см. ниже) |
 | `lang` | `auto` | `auto`, `ru` или `en`: язык интерфейса и названий техники |
-| `logo` | `main_white` | `main_white` или `main_red` |
+| `logo` | `main_white` | `main_white`, `main_red` или `main_diamond` (иконка игры) |
 | `show_indicators` | `true` | скорость, высота и экипаж во второй строке |
 | `air_speed` | `IAS` | `IAS` или `TAS` |
 | `altitude` | `RADIO` | `RADIO` (если радиовысоты нет, показывается абсолютная) или `ABSOLUTE` |
 | `custom_images` | `true` | показывать картинку из приложения Discord, если она загружена для этой техники |
+| `show_kills` | `false` | сколько ты уничтожил в текущем бою, по киллфиду (нужен `nickname`) |
+| `nickname` | пусто | ник в игре без тега полка, с учётом регистра |
+| `show_nation` | `false` | нация и класс техники в подписи маленькой картинки; с флагом (картинка `flag_<нация>` из приложения, если загружена, иначе из `assets/flags`) |
+| `battle_timer` | `false` | в бою таймер считает с начала боя, в ангаре — с запуска игры |
+| `buttons` | `false` | кнопки «Машина на вики» и «WT Discord RPC»; Discord показывает их другим, но не тебе |
 | `api_url` | `http://localhost:8111` | адрес API игры (переменная окружения `WT_API_URL` имеет приоритет) |
 | `names_url` | `db-latest` из WT-Vehicles-Parser | откуда обновлять названия; пустое значение отключает обновление |
 | `check_updates` | `true` | проверять новую версию при запуске |
@@ -42,8 +47,10 @@ Discord находится автоматически, как бы он ни б�
 Название в Discord («Играет в War Thunder») и логотипы задаются приложением Discord. Чтобы использовать своё приложение:
 
 1. Создайте приложение с названием «War Thunder» на <https://discord.com/developers/applications>.
-2. В разделе Rich Presence → Art Assets загрузите логотипы под именами `main_white` и `main_red`. Можно также загрузить картинки техники, назвав их по id машины (например, `us_m1a1_aim_abrams`): при включённом `custom_images` они заменят картинку из энциклопедии.
+2. По желанию в разделе Rich Presence → Art Assets загрузите свои логотипы под именами `main_white`, `main_red` и `main_diamond` (иначе берутся логотипы из `assets/logo`). Можно также загрузить картинки техники, назвав их по id машины (например, `us_m1a1_aim_abrams`): при включённом `custom_images` они заменят картинку из энциклопедии.
 3. Укажите Application ID в `client_id`.
+
+Флаги работают сразу (`assets/flags` в этом репозитории). Чтобы использовать свои, загрузите картинки под именами `flag_usa`, `flag_germany`, `flag_ussr`, `flag_britain`, `flag_japan`, `flag_china`, `flag_italy`, `flag_france`, `flag_sweden`, `flag_israel`. Флаги самой игры есть в датамайне: `atlases.vromfs.bin_u/gameuiskin/country_<нация>_round.svg`.
 
 ## Сборка
 

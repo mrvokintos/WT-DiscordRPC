@@ -47,6 +47,7 @@ fn convert(items: Vec<super::Item>) -> Vec<ksni::MenuItem<Tray>> {
                 ..Default::default()
             }
             .into(),
+            Item::Sub(label, items) => SubMenu { label, submenu: convert(items), ..Default::default() }.into(),
             Item::Separator => MenuItem::Separator,
         })
         .collect()

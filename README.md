@@ -24,11 +24,16 @@ Most settings are in the tray menu. All of them are also stored in `config.toml`
 |---|---|---|
 | `client_id` | the project's application | Discord application id (see below) |
 | `lang` | `auto` | `auto`, `ru` or `en`: interface and vehicle name language |
-| `logo` | `main_white` | `main_white` or `main_red` |
+| `logo` | `main_white` | `main_white`, `main_red` or `main_diamond` (the game icon) |
 | `show_indicators` | `true` | speed, altitude and crew in the second line |
 | `air_speed` | `IAS` | `IAS` or `TAS` |
 | `altitude` | `RADIO` | `RADIO` (falls back to absolute when unavailable) or `ABSOLUTE` |
 | `custom_images` | `true` | use the application's own image for a vehicle when one exists |
+| `show_kills` | `false` | your kills in the current battle, from the kill feed (needs `nickname`) |
+| `nickname` | empty | your in-game nickname without the squadron tag, case-sensitive |
+| `show_nation` | `false` | nation and vehicle class under the small image; with its flag (the application's `flag_<nation>` image if uploaded, otherwise the one from `assets/flags`) |
+| `battle_timer` | `false` | in a battle the timer counts from the battle's start, in the hangar from the game's start |
+| `buttons` | `false` | "Vehicle on wiki" and "WT Discord RPC" buttons; Discord shows them to others, not to you |
 | `api_url` | `http://localhost:8111` | game API address (the `WT_API_URL` environment variable overrides it) |
 | `names_url` | WT-Vehicles-Parser `db-latest` | where vehicle names are updated from; empty disables updates |
 | `check_updates` | `true` | check for a new version on start |
@@ -42,8 +47,10 @@ Names come from [WT Vehicles Parser](https://github.com/mrvokintos/WT-Vehicles-P
 The name shown in Discord ("Playing War Thunder") and the logos come from a Discord application. To use your own:
 
 1. Create an application named "War Thunder" at <https://discord.com/developers/applications>.
-2. Under Rich Presence → Art Assets, upload the logos as `main_white` and `main_red`. You can also upload vehicle pictures named by vehicle id (for example `us_m1a1_aim_abrams`); with `custom_images` on, they replace the encyclopedia picture.
+2. Optionally, under Rich Presence → Art Assets, upload your own logos as `main_white`, `main_red` and `main_diamond` (otherwise the ones in `assets/logo` are used). You can also upload vehicle pictures named by vehicle id (for example `us_m1a1_aim_abrams`); with `custom_images` on, they replace the encyclopedia picture.
 3. Put the Application ID into `client_id`.
+
+Flags work out of the box (`assets/flags` in this repository). To use your own, upload images named `flag_usa`, `flag_germany`, `flag_ussr`, `flag_britain`, `flag_japan`, `flag_china`, `flag_italy`, `flag_france`, `flag_sweden`, `flag_israel`. The game's own flags are in the datamine: `atlases.vromfs.bin_u/gameuiskin/country_<nation>_round.svg`.
 
 ## Building
 

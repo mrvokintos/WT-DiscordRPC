@@ -125,6 +125,7 @@ pub fn run_poller(app: App) {
     let mut start: Option<u64> = None;
     let mut last_seen: Option<Instant> = None;
     let mut api: Option<(String, Api)> = None;
+    let mut battle = crate::battle::Battle::default();
 
     loop {
         let (cfg, names, assets, quit) = app.with(|s| {
@@ -160,7 +161,20 @@ pub fn run_poller(app: App) {
             last_seen = Some(Instant::now());
             start.get_or_insert_with(now);
         }
-        let ctx = Ctx { cfg: &cfg, lang: cfg.lang(), names: &names, assets: &assets, start: start.unwrap_or_else(now) };
+        battle.tick(!matches!(snap, Snapshot::NotRunning | Snapshot::Hangar), now());
+        if battle.active && cfg.show_kills && !cfg.nickname.trim().is_empty() {
+            if let Some(msgs) = api.as_ref().and_then(|(_, a)| a.hud_messages(battle.cursor())) {
+                battle.on_messages(&msgs, cfg.nickname.trim());
+            }
+        }
+        let ctx = Ctx {
+            cfg: &cfg,
+            lang: cfg.lang(),
+            names: &names,
+            assets: &assets,
+            start: start.unwrap_or_else(now),
+            battle: &battle,
+        };
         let (status, activity) = presence::build(&snap, &ctx);
 
         // only talk to Discord while the game runs, so the presence vanishes with it

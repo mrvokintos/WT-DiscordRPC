@@ -21,6 +21,9 @@ pub enum Logo {
     Red,
     #[serde(rename = "main_white")]
     White,
+    /// the game's own icon
+    #[serde(rename = "main_diamond")]
+    Diamond,
 }
 
 impl Logo {
@@ -28,6 +31,7 @@ impl Logo {
         match self {
             Logo::Red => "main_red",
             Logo::White => "main_white",
+            Logo::Diamond => "main_diamond",
         }
     }
 }
@@ -53,7 +57,7 @@ pub struct Config {
     pub client_id: String,
     /// interface and vehicle name language: auto, ru, en
     pub lang: Lang,
-    /// game logo: main_red or main_white
+    /// game logo: main_red, main_white or main_diamond
     pub logo: Logo,
     /// speed / altitude / crew in the second line
     pub show_indicators: bool,
@@ -63,6 +67,16 @@ pub struct Config {
     pub altitude: Altitude,
     /// use the application's own images for vehicles that have one
     pub custom_images: bool,
+    /// your kills in the current battle, from the kill feed (needs `nickname`)
+    pub show_kills: bool,
+    /// in-game nickname without the squadron tag, case-sensitive
+    pub nickname: String,
+    /// nation flag (assets flag_<nation>) and vehicle class in the small image
+    pub show_nation: bool,
+    /// in a battle the timer counts from its start instead of the game's
+    pub battle_timer: bool,
+    /// "Vehicle on wiki" and "WT Discord RPC" buttons (Discord hides them from yourself)
+    pub buttons: bool,
     /// game API (the WT_API_URL environment variable overrides it)
     pub api_url: String,
     /// where names.json and manifest.json are downloaded from; empty disables updates
@@ -81,6 +95,11 @@ impl Default for Config {
             air_speed: AirSpeed::Ias,
             altitude: Altitude::Radio,
             custom_images: true,
+            show_kills: false,
+            nickname: String::new(),
+            show_nation: false,
+            battle_timer: false,
+            buttons: false,
             api_url: DEFAULT_API_URL.into(),
             names_url: DEFAULT_NAMES_URL.into(),
             check_updates: true,
@@ -152,6 +171,8 @@ mod tests {
         let p: Config = toml::from_str("lang = \"ru\"\nlogo = \"main_red\"\nair_speed = \"TAS\"").unwrap();
         assert_eq!(p.lang, Lang::Ru);
         assert_eq!(p.logo, Logo::Red);
+        let d: Config = toml::from_str("logo = \"main_diamond\"").unwrap();
+        assert_eq!(d.logo.asset(), "main_diamond");
         assert_eq!(p.air_speed, AirSpeed::Tas);
         assert!(p.show_indicators);
         // keys of older versions are ignored

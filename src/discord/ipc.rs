@@ -103,6 +103,7 @@ impl Client {
         });
         self.stream.write_all(&encode(OP_FRAME, &payload))?;
         let resp = self.read_reply()?;
+        log::debug!("Discord reply: {resp}");
         if resp.get("evt").and_then(Value::as_str) == Some("ERROR") {
             log::warn!("Discord rejected the activity: {}", resp.get("data").unwrap_or(&Value::Null));
         }

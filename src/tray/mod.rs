@@ -14,6 +14,10 @@ use crate::{autostart, paths, update};
 pub enum Action {
     ToggleIndicators,
     ToggleCustomImages,
+    ToggleKills,
+    ToggleNation,
+    ToggleBattleTimer,
+    ToggleButtons,
     Logo(Logo),
     Lang(Lang),
     AirSpeed(AirSpeed),
@@ -31,6 +35,8 @@ pub enum Item {
     Check(String, bool, Action),
     /// submenu label, selected index, options
     Radio(String, usize, Vec<(String, Action)>),
+    /// plain submenu
+    Sub(String, Vec<Item>),
     Separator,
 }
 
@@ -77,10 +83,28 @@ impl Menu {
                 ],
             ));
             items.push(Item::Check(tr(l, "custom_images").into(), c.custom_images, Action::ToggleCustomImages));
+            let kills_label = if c.nickname.trim().is_empty() { "show_kills_no_nick" } else { "show_kills" };
+            items.push(Item::Sub(
+                tr(l, "extras").into(),
+                vec![
+                    Item::Check(tr(l, kills_label).into(), c.show_kills, Action::ToggleKills),
+                    Item::Check(tr(l, "show_nation").into(), c.show_nation, Action::ToggleNation),
+                    Item::Check(tr(l, "battle_timer").into(), c.battle_timer, Action::ToggleBattleTimer),
+                    Item::Check(tr(l, "buttons").into(), c.buttons, Action::ToggleButtons),
+                ],
+            ));
             items.push(Item::Radio(
                 tr(l, "logo").into(),
-                (c.logo == Logo::White) as usize,
-                vec![(tr(l, "logo_red").into(), Action::Logo(Logo::Red)), (tr(l, "logo_white").into(), Action::Logo(Logo::White))],
+                match c.logo {
+                    Logo::Red => 0,
+                    Logo::White => 1,
+                    Logo::Diamond => 2,
+                },
+                vec![
+                    (tr(l, "logo_red").into(), Action::Logo(Logo::Red)),
+                    (tr(l, "logo_white").into(), Action::Logo(Logo::White)),
+                    (tr(l, "logo_diamond").into(), Action::Logo(Logo::Diamond)),
+                ],
             ));
             items.push(Item::Radio(
                 tr(l, "language").into(),
@@ -110,6 +134,10 @@ pub fn run(app: &App, action: Action) {
     match action {
         Action::ToggleIndicators => app.change(|c| c.show_indicators = !c.show_indicators),
         Action::ToggleCustomImages => app.change(|c| c.custom_images = !c.custom_images),
+        Action::ToggleKills => app.change(|c| c.show_kills = !c.show_kills),
+        Action::ToggleNation => app.change(|c| c.show_nation = !c.show_nation),
+        Action::ToggleBattleTimer => app.change(|c| c.battle_timer = !c.battle_timer),
+        Action::ToggleButtons => app.change(|c| c.buttons = !c.buttons),
         Action::Logo(v) => app.change(|c| c.logo = v),
         Action::Lang(v) => app.change(|c| c.lang = v),
         Action::AirSpeed(v) => app.change(|c| c.air_speed = v),

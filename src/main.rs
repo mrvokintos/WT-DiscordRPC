@@ -3,9 +3,11 @@
 mod api;
 mod app;
 mod autostart;
+mod battle;
 mod config;
 mod discord;
 mod i18n;
+mod killfeed;
 mod names;
 mod paths;
 mod presence;

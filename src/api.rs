@@ -85,6 +85,19 @@ impl Api {
     }
 }
 
+impl Api {
+    /// Kill feed messages after `last_dmg`: (id, text).
+    pub fn hud_messages(&self, last_dmg: i64) -> Option<Vec<(i64, String)>> {
+        let v = self.get(&format!("/hudmsg?lastEvt=-1&lastDmg={last_dmg}")).ok()?;
+        let arr = v.get("damage")?.as_array()?;
+        Some(
+            arr.iter()
+                .filter_map(|m| Some((m.get("id")?.as_i64()?, m.get("msg")?.as_str()?.to_string())))
+                .collect(),
+        )
+    }
+}
+
 pub fn classify(ind: Indicators, state: Option<State>) -> Snapshot {
     if ind.army == "dummy_plane" || ind.vehicle == "dummy_plane" {
         return Snapshot::Loading;

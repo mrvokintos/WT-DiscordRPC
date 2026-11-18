@@ -2,13 +2,17 @@
 
 use crate::api::{self, Snapshot};
 use crate::config::{AirSpeed, Altitude, Config, Lang};
-use crate::i18n::{names_column, tr};
+use crate::battle::Battle;
+use crate::i18n::{self, names_column, tr};
 use crate::names::{self, Names};
 use serde_json::{json, Value};
 use std::collections::HashSet;
 
 pub const GAME_NAME: &str = "War Thunder";
 const IMAGE_URL: &str = "https://static.encyclopedia.warthunder.com/images";
+const WIKI_URL: &str = "https://wiki.warthunder.com/unit";
+/// images in this repository, used when the Discord application has no asset of that name
+const REPO_ASSETS: &str = "https://raw.githubusercontent.com/mrvokintos/WT-DiscordRPC/main/assets";
 
 pub struct Ctx<'a> {
     pub cfg: &'a Config,
@@ -18,30 +22,66 @@ pub struct Ctx<'a> {
     pub assets: &'a HashSet<String>,
     /// unix seconds when the game was first seen
     pub start: u64,
+    pub battle: &'a Battle,
+}
+
+impl Ctx<'_> {
+    /// Asset key if uploaded to the application, else a link to the repository copy.
+    fn image(&self, key: &str, dir: &str) -> String {
+        if self.assets.contains(key) { key.to_string() } else { format!("{REPO_ASSETS}/{dir}/{key}.png") }
+    }
+
+    fn logo(&self) -> String {
+        self.image(self.cfg.logo.asset(), "logo")
+    }
+
+    fn timer_start(&self) -> u64 {
+        if self.cfg.battle_timer && self.battle.active { self.battle.start } else { self.start }
+    }
+
+    fn kills(&self) -> Option<String> {
+        (self.cfg.show_kills && !self.cfg.nickname.is_empty() && self.battle.active)
+            .then(|| format!("{}: {}", tr(self.lang, "kills"), self.battle.kills))
+    }
 }
 
 /// Short human status for the tray, plus the activity (None = clear).
 pub fn build(snap: &Snapshot, ctx: &Ctx) -> (String, Option<Value>) {
     let l = ctx.lang;
-    let logo = ctx.cfg.logo.asset();
-    let simple = |details: &str| {
-        json!({
+    let logo = ctx.logo();
+    let finish = |mut a: Value, state: Option<String>, id: Option<&str>| {
+        if let Some(s) = state.filter(|s| !s.is_empty()) {
+            a["state"] = json!(clamp(&s));
+        }
+        if ctx.cfg.buttons {
+            let mut b = vec![];
+            if let Some(id) = id {
+                b.push(json!({ "label": tr(l, "wiki_button"), "url": format!("{WIKI_URL}/{id}") }));
+            }
+            b.push(json!({ "label": "WT Discord RPC", "url": format!("https://github.com/{}", crate::update::REPO) }));
+            a["buttons"] = json!(b);
+        }
+        a
+    };
+    let simple = |details: &str, state: Option<String>| {
+        let a = json!({
             "type": 0,
             "details": clamp(details),
-            "timestamps": { "start": ctx.start },
+            "timestamps": { "start": ctx.timer_start() },
             "assets": { "large_image": logo, "large_text": GAME_NAME },
-        })
+        });
+        finish(a, state, None)
     };
     match snap {
         Snapshot::NotRunning => (tr(l, "game_not_running").into(), None),
-        Snapshot::Hangar => (tr(l, "hangar").into(), Some(simple(tr(l, "hangar")))),
-        Snapshot::Loading => (tr(l, "loading").into(), Some(simple(tr(l, "loading")))),
-        Snapshot::InBattle => (tr(l, "in_battle").into(), Some(simple(tr(l, "in_battle")))),
+        Snapshot::Hangar => (tr(l, "hangar").into(), Some(simple(tr(l, "hangar"), None))),
+        Snapshot::Loading => (tr(l, "loading").into(), Some(simple(tr(l, "loading"), None))),
+        Snapshot::InBattle => (tr(l, "in_battle").into(), Some(simple(tr(l, "in_battle"), ctx.kills()))),
         Snapshot::Ground(ind) | Snapshot::Air(ind, _) | Snapshot::Other(ind) => {
             let id = api::vehicle_id(&ind.vehicle);
             let name = names::lookup(ctx.names, &id, names_column(l));
             let details = format!("{}: {name}", tr(l, "plays_on"));
-            let state = if !ctx.cfg.show_indicators {
+            let indicators = if !ctx.cfg.show_indicators {
                 None
             } else if let Snapshot::Air(ind, st) = snap {
                 air_state(ctx.cfg, l, ind, st.as_ref())
@@ -50,24 +90,48 @@ pub fn build(snap: &Snapshot, ctx: &Ctx) -> (String, Option<Value>) {
             } else {
                 None
             };
+            let state: Vec<String> = indicators.into_iter().chain(ctx.kills()).collect();
             let image = if ctx.cfg.custom_images && ctx.assets.contains(&id) { id.clone() } else { format!("{IMAGE_URL}/{id}.png") };
-            let mut a = json!({
+            let (small_image, small_text) = small(ctx, &id);
+            let a = json!({
                 "type": 0,
                 "details": clamp(&details),
-                "timestamps": { "start": ctx.start },
+                "timestamps": { "start": ctx.timer_start() },
                 "assets": {
                     "large_image": image,
                     "large_text": clamp(&name),
-                    "small_image": logo,
-                    "small_text": GAME_NAME,
+                    "small_image": small_image,
+                    "small_text": clamp(&small_text),
                 },
             });
-            if let Some(s) = state {
-                a["state"] = json!(clamp(&s));
-            }
-            (details, Some(a))
+            (details, Some(finish(a, Some(state.join(" | ")), Some(&id))))
         }
     }
+}
+
+/// Small image: the nation flag (asset flag_<nation>) when uploaded, else the logo;
+/// its caption: "USA · Medium tank" with show_nation.
+fn small(ctx: &Ctx, id: &str) -> (String, String) {
+    let logo = (ctx.logo(), GAME_NAME.to_string());
+    if !ctx.cfg.show_nation {
+        return logo;
+    }
+    let nation_key = names::info(ctx.names, id, "nation");
+    let text: Vec<&str> = [
+        nation_key.and_then(|n| i18n::nation(ctx.lang, n)),
+        names::info(ctx.names, id, "class").and_then(|c| i18n::class(ctx.lang, c)),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    if text.is_empty() {
+        return logo;
+    }
+    let image = match nation_key {
+        Some(n) if i18n::nation(ctx.lang, n).is_some() => ctx.image(&format!("flag_{n}"), "flags"),
+        _ => logo.0,
+    };
+    (image, text.join(" · "))
 }
 
 fn ground_state(l: Lang, ind: &api::Indicators) -> Option<String> {
@@ -136,13 +200,13 @@ mod tests {
     #[test]
     fn ground_presence() {
         let (cfg, n, a) = (Config::default(), names(), HashSet::new());
-        let ctx = Ctx { cfg: &cfg, lang: Lang::En, names: &n, assets: &a, start: 100 };
+        let ctx = Ctx { cfg: &cfg, lang: Lang::En, names: &n, assets: &a, start: 100, battle: &Battle::default() };
         let (status, act) = build(&tank(), &ctx);
         let act = act.unwrap();
         assert_eq!(status, "Plays on: M1A1 SA");
         assert_eq!(act["state"], "Speed: 38 km/h | Crew: 3/4");
         assert_eq!(act["assets"]["large_image"], format!("{IMAGE_URL}/us_m1a1_aim_abrams.png"));
-        assert_eq!(act["assets"]["small_image"], "main_white");
+        assert_eq!(act["assets"]["small_image"], format!("{REPO_ASSETS}/logo/main_white.png"));
         assert_eq!(act["timestamps"]["start"], 100);
     }
 
@@ -151,7 +215,7 @@ mod tests {
         let cfg = Config { air_speed: AirSpeed::Tas, ..Default::default() };
         let n = names();
         let a = HashSet::from(["su_27".to_string()]);
-        let ctx = Ctx { cfg: &cfg, lang: Lang::Ru, names: &n, assets: &a, start: 0 };
+        let ctx = Ctx { cfg: &cfg, lang: Lang::Ru, names: &n, assets: &a, start: 0, battle: &Battle::default() };
         let act = build(&plane(), &ctx).1.unwrap();
         assert_eq!(act["details"], "Играет на: Су-27");
         assert_eq!(act["state"], "Скорость TAS: 690 км/ч | Радиовысота: 2870 м");
@@ -163,17 +227,81 @@ mod tests {
         let n = names();
         let a = HashSet::new();
         let cfg = Config { altitude: Altitude::Absolute, ..Default::default() };
-        let ctx = Ctx { cfg: &cfg, lang: Lang::En, names: &n, assets: &a, start: 0 };
+        let ctx = Ctx { cfg: &cfg, lang: Lang::En, names: &n, assets: &a, start: 0, battle: &Battle::default() };
         assert_eq!(build(&plane(), &ctx).1.unwrap()["state"], "IAS: 612 km/h | Altitude: 3050 m");
         let cfg = Config { show_indicators: false, ..Default::default() };
-        let ctx = Ctx { cfg: &cfg, lang: Lang::En, names: &n, assets: &a, start: 0 };
+        let ctx = Ctx { cfg: &cfg, lang: Lang::En, names: &n, assets: &a, start: 0, battle: &Battle::default() };
         assert!(build(&plane(), &ctx).1.unwrap().get("state").is_none());
+    }
+
+    #[test]
+    fn optional_extras() {
+        let n = crate::names::parse(r#"{"us_m1a1_aim_abrams":{"English":"M1A1 SA","nation":"usa","class":"medium_tank"}}"#).unwrap();
+        let cfg = Config {
+            show_kills: true,
+            nickname: "me".into(),
+            show_nation: true,
+            battle_timer: true,
+            buttons: true,
+            ..Default::default()
+        };
+        let mut battle = Battle::default();
+        battle.tick(true, 500);
+        battle.on_messages(&[], "me");
+        battle.on_messages(&[(1, "me (M1A1 SA) destroyed X (T-90M)".into())], "me");
+        let a = HashSet::from(["flag_usa".to_string()]);
+        let ctx = Ctx { cfg: &cfg, lang: Lang::Ru, names: &n, assets: &a, start: 100, battle: &battle };
+        let act = build(&tank(), &ctx).1.unwrap();
+        assert_eq!(act["state"], "Скорость: 38 км/ч | Экипаж: 3/4 | Уничтожено: 1");
+        assert_eq!(act["timestamps"]["start"], 500);
+        assert_eq!(act["assets"]["small_image"], "flag_usa");
+        assert_eq!(act["assets"]["small_text"], "США · Средний танк");
+        assert_eq!(act["buttons"][0]["url"], "https://wiki.warthunder.com/unit/us_m1a1_aim_abrams");
+        assert_eq!(act["buttons"].as_array().unwrap().len(), 2);
+        // no flag asset uploaded: the flag from the repository
+        let none = HashSet::new();
+        let ctx = Ctx { cfg: &cfg, lang: Lang::En, names: &n, assets: &none, start: 100, battle: &battle };
+        let act = build(&tank(), &ctx).1.unwrap();
+        assert_eq!(act["assets"]["small_image"], format!("{REPO_ASSETS}/flags/flag_usa.png"));
+        assert_eq!(act["assets"]["small_text"], "USA · Medium tank");
+        // in the hangar: session timer, no kills
+        battle.tick(false, 900);
+        let ctx = Ctx { cfg: &cfg, lang: Lang::En, names: &n, assets: &none, start: 100, battle: &battle };
+        let act = build(&Snapshot::Hangar, &ctx).1.unwrap();
+        assert_eq!(act["timestamps"]["start"], 100);
+        assert!(act.get("state").is_none());
+        assert_eq!(act["buttons"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn extras_are_off_by_default() {
+        let (cfg, n, a) = (Config::default(), names(), HashSet::from(["flag_usa".to_string()]));
+        let mut battle = Battle::default();
+        battle.tick(true, 500);
+        let ctx = Ctx { cfg: &cfg, lang: Lang::En, names: &n, assets: &a, start: 100, battle: &battle };
+        let act = build(&tank(), &ctx).1.unwrap();
+        assert_eq!(act["timestamps"]["start"], 100);
+        assert_eq!(act["assets"]["small_image"], format!("{REPO_ASSETS}/logo/main_white.png"));
+        assert_eq!(act["assets"]["small_text"], GAME_NAME);
+        assert!(act.get("buttons").is_none());
+        assert_eq!(act["state"], "Speed: 38 km/h | Crew: 3/4");
+    }
+
+    #[test]
+    fn uploaded_logo_wins_over_repository() {
+        let (cfg, n) = (Config { logo: crate::config::Logo::Red, ..Default::default() }, names());
+        let a = HashSet::from(["main_red".to_string()]);
+        let ctx = Ctx { cfg: &cfg, lang: Lang::En, names: &n, assets: &a, start: 0, battle: &Battle::default() };
+        assert_eq!(build(&Snapshot::Hangar, &ctx).1.unwrap()["assets"]["large_image"], "main_red");
+        let none = HashSet::new();
+        let ctx = Ctx { cfg: &cfg, lang: Lang::En, names: &n, assets: &none, start: 0, battle: &Battle::default() };
+        assert_eq!(build(&Snapshot::Hangar, &ctx).1.unwrap()["assets"]["large_image"], format!("{REPO_ASSETS}/logo/main_red.png"));
     }
 
     #[test]
     fn hangar_and_offline() {
         let (cfg, n, a) = (Config::default(), names(), HashSet::new());
-        let ctx = Ctx { cfg: &cfg, lang: Lang::Ru, names: &n, assets: &a, start: 0 };
+        let ctx = Ctx { cfg: &cfg, lang: Lang::Ru, names: &n, assets: &a, start: 0, battle: &Battle::default() };
         assert_eq!(build(&Snapshot::Hangar, &ctx).1.unwrap()["details"], "В ангаре");
         assert!(build(&Snapshot::NotRunning, &ctx).1.is_none());
     }

@@ -28,7 +28,12 @@ pub struct Ctx<'a> {
 impl Ctx<'_> {
     /// Asset key if uploaded to the application, else a link to the repository copy.
     fn image(&self, key: &str, dir: &str) -> String {
-        if self.assets.contains(key) { key.to_string() } else { format!("{REPO_ASSETS}/{dir}/{key}.png") }
+        if self.assets.contains(key) {
+            key.to_string()
+        } else {
+            // Discord's image proxy caches per URL, a failed fetch too: the version makes a new URL
+            format!("{REPO_ASSETS}/{dir}/{key}.png?v={}", env!("CARGO_PKG_VERSION"))
+        }
     }
 
     fn logo(&self) -> String {
@@ -206,7 +211,7 @@ mod tests {
         assert_eq!(status, "Plays on: M1A1 SA");
         assert_eq!(act["state"], "Speed: 38 km/h | Crew: 3/4");
         assert_eq!(act["assets"]["large_image"], format!("{IMAGE_URL}/us_m1a1_aim_abrams.png"));
-        assert_eq!(act["assets"]["small_image"], format!("{REPO_ASSETS}/logo/main_white.png"));
+        assert_eq!(act["assets"]["small_image"], format!("{REPO_ASSETS}/logo/main_white.png?v={}", env!("CARGO_PKG_VERSION")));
         assert_eq!(act["timestamps"]["start"], 100);
     }
 
@@ -262,7 +267,7 @@ mod tests {
         let none = HashSet::new();
         let ctx = Ctx { cfg: &cfg, lang: Lang::En, names: &n, assets: &none, start: 100, battle: &battle };
         let act = build(&tank(), &ctx).1.unwrap();
-        assert_eq!(act["assets"]["small_image"], format!("{REPO_ASSETS}/flags/flag_usa.png"));
+        assert_eq!(act["assets"]["small_image"], format!("{REPO_ASSETS}/flags/flag_usa.png?v={}", env!("CARGO_PKG_VERSION")));
         assert_eq!(act["assets"]["small_text"], "USA · Medium tank");
         // in the hangar: session timer, no kills
         battle.tick(false, 900);
@@ -281,7 +286,7 @@ mod tests {
         let ctx = Ctx { cfg: &cfg, lang: Lang::En, names: &n, assets: &a, start: 100, battle: &battle };
         let act = build(&tank(), &ctx).1.unwrap();
         assert_eq!(act["timestamps"]["start"], 100);
-        assert_eq!(act["assets"]["small_image"], format!("{REPO_ASSETS}/logo/main_white.png"));
+        assert_eq!(act["assets"]["small_image"], format!("{REPO_ASSETS}/logo/main_white.png?v={}", env!("CARGO_PKG_VERSION")));
         assert_eq!(act["assets"]["small_text"], GAME_NAME);
         assert!(act.get("buttons").is_none());
         assert_eq!(act["state"], "Speed: 38 km/h | Crew: 3/4");
@@ -295,7 +300,7 @@ mod tests {
         assert_eq!(build(&Snapshot::Hangar, &ctx).1.unwrap()["assets"]["large_image"], "main_red");
         let none = HashSet::new();
         let ctx = Ctx { cfg: &cfg, lang: Lang::En, names: &n, assets: &none, start: 0, battle: &Battle::default() };
-        assert_eq!(build(&Snapshot::Hangar, &ctx).1.unwrap()["assets"]["large_image"], format!("{REPO_ASSETS}/logo/main_red.png"));
+        assert_eq!(build(&Snapshot::Hangar, &ctx).1.unwrap()["assets"]["large_image"], format!("{REPO_ASSETS}/logo/main_red.png?v={}", env!("CARGO_PKG_VERSION")));
     }
 
     #[test]
